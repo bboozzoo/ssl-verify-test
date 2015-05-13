@@ -126,8 +126,20 @@ static int do_connect(const char *host, int port)
 
 static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 {
-  printf("verify called\n");
-  return 1;
+    X509 *cert = X509_STORE_CTX_get_current_cert(ctx);
+    char buf[1024];
+    int err;
+    int depth;
+
+    X509_NAME_oneline(X509_get_subject_name(cert), buf, sizeof(buf));
+
+    err = X509_STORE_CTX_get_error(ctx);
+    depth = X509_STORE_CTX_get_error_depth(ctx);
+    LOG("verify: %s\n", buf);
+    LOG("   depth: %d preverify: %d err: %s\n",
+        depth, preverify_ok, X509_verify_cert_error_string(err));
+
+    return preverify_ok;
 }
 
 /**
