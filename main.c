@@ -140,7 +140,9 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    /* socket_setsockblock(fd, 0); */
+    /* make socket non-blocking, to see
+     * SSL_ERROR_WANT_READ/SSL_ERROR_WANT_WRITE interaction */
+    socket_setsockblock(fd, 0);
 
     LOG("connected: %d\n", fd);
     OPENSSL_config(NULL);
@@ -178,40 +180,61 @@ int main(int argc, char *argv[])
     SSL_set_verify(ssl, SSL_VERIFY_PEER, verify_callback);
     SSL_set_fd(ssl, fd);
 
+    int handshake_status = 0;
     while(1) {
-        int sslret = SSL_connect(ssl);
-        if (sslret == 1)
+        /* if socket was non-blockin we'd have to loop here and handle
+         * SSL_ERROR_WANT_READ/SSL_ERROR_WANT_WRITE until the
+         * handshake completes or fails */
+        handshake_status = SSL_connect(ssl);
+        if (handshake_status == 1)
         {
-            printf("proto version: %s\n", SSL_get_version(ssl));
-            printf("cipher: %s\n", SSL_get_cipher(ssl));
-
-            int vres = SSL_get_verify_result(ssl);
-            printf("verify result: %d\n", vres);
-            if (vres != X509_V_OK)
-            {
-                int err = SSL_get_error(ssl, vres);
-                printf("SSL verify error: %d\n", err);
-            }
             break;
         }
         else
         {
-            int sslerr = SSL_get_error(ssl, sslret);
-            if (sslerr != SSL_ERROR_WANT_READ && sslerr != SSL_ERROR_WANT_WRITE)
-            {
-                LOG("SSL connect failed: %d\n", sslret);
-                LOG("failed to perform handshake: %d\n", SSL_get_error(ssl, sslret));
-                break;
-            }
-            else
+            int sslerr = SSL_get_error(ssl, handshake_status);
+
+            if (sslerr != SSL_ERROR_WANT_READ
+                && sslerr != SSL_ERROR_WANT_WRITE)
             {
                 LOG("SSL error: %d\n", sslerr);
+                break;
             }
         }
     }
 
+    if (handshake_status == 1)
+    {
+        /* handshake complete */
+        LOG("proto version: %s\n", SSL_get_version(ssl));
+        LOG("cipher: %s\n", SSL_get_cipher(ssl));
 
+        int vres = SSL_get_verify_result(ssl);
+        LOG("verify result: %s\n",
+               X509_verify_cert_error_string(vres));
+        if (vres != X509_V_OK)
+        {
+            int err = SSL_get_error(ssl, vres);
+            LOG("SSL verify error: %d\n", err);
+        }
+        else
+        {
+            LOG("certificate verified\n");
+        }
+    }
+    else
+    {
+        /* handshake terminated */
+        LOG("SSL connect failed: %d\n", handshake_status);
+        LOG("failed to perform handshake: %d\n",
+            SSL_get_error(ssl, handshake_status));
+    }
+
+
+    /* shutdown should go through the same IO loop as SSL_connect() if
+     * socket is non-blocking */
     SSL_shutdown(ssl);
+
     SSL_free(ssl);
     SSL_CTX_free(ctx);
 
