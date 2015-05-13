@@ -32,6 +32,9 @@
         fprintf(stderr, __VA_ARGS__);           \
     } while(0)
 
+/* if set to 1, ceritificates are alwayas accepted */
+static int always_accept = 0;
+
 /**
  * socket_setsockblock:
  * @sock: file descriptor
@@ -138,6 +141,13 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     LOG("verify: %s\n", buf);
     LOG("   depth: %d preverify: %d err: %s\n",
         depth, preverify_ok, X509_verify_cert_error_string(err));
+
+    if (preverify_ok == 0 && always_accept)
+    {
+        LOG("overriding verification\n");
+        X509_STORE_CTX_set_error(ctx, X509_V_OK);
+        preverify_ok = 1;
+    }
 
     return preverify_ok;
 }
