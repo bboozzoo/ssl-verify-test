@@ -127,7 +127,8 @@ int main(int argc, char *argv[])
 
     if (argc < 3)
     {
-        LOG("usage: %s <host> <port>\n", program_invocation_short_name);
+        LOG("usage: %s <host> <port> [<ca-cert|ca-path>]\n",
+            program_invocation_short_name);
         exit(1);
     }
     host = argv[1];
@@ -155,13 +156,14 @@ int main(int argc, char *argv[])
 
     if (argc == 4)
     {
-        char *cacert = NULL;
-        char *capath = NULL;
+        const char *cacert = NULL;
+        const char *capath = NULL;
+        const char *path = argv[3];
 
-        if (isdir(argv[3]))
-            capath = argv[3];
+        if (isdir(path))
+            capath = path;
         else
-            cacert = argv[3];
+            cacert = path;
 
         LOG("CA path: %s cert: %s\n", capath, cacert);
         int status = SSL_CTX_load_verify_locations(ctx, cacert, capath);
