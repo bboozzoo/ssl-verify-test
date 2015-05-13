@@ -172,19 +172,53 @@ static int isdir(const char *path)
     return 0;
 }
 
+static void usage(int exit_code)
+{
+    LOG("Usage:\n"
+        "  %s [-a] <host> <port> [<ca-path>]\n"
+        "\n"
+        "Options:\n"
+        "     -a      Always accept certificates\n"
+        "     -h      Show help message\n"
+        "Arguments:\n"
+        "  <host>     Host to connect to, ex: google.com\n"
+        "  <port>     Port, ex: 443\n"
+        "  <ca-path>  Path to directory with certificates or a PEM\n"
+        "             certificate that shall be used for verification\n",
+        program_invocation_short_name);
+    exit(exit_code);
+}
+
 int main(int argc, char *argv[])
 {
     const char *host = NULL;
     int port = 0;
-
-    if (argc < 3)
+    int opt = 0;
+    while ((opt = getopt(argc, argv, "ah")) != -1)
     {
-        LOG("usage: %s <host> <port> [<ca-cert|ca-path>]\n",
-            program_invocation_short_name);
-        exit(1);
+        switch (opt)
+        {
+        case 'a':
+            LOG("override certificate verification\n");
+            always_accept = 1;
+            break;
+        case 'h':
+            usage(0);
+            break;
+        default:
+            usage(1);
+            /* not reached */
+        }
     }
-    host = argv[1];
-    port = atoi(argv[2]);
+
+    if (argc < (optind + 2))
+    {
+        LOG("Error: arguments not provided\n");
+        usage(1);
+        /* not reached */
+    }
+    host = argv[optind];
+    port = atoi(argv[optind + 1]);
 
     LOG("connect to %s:%d\n", host, port);
     int fd = do_connect(host, port);
@@ -208,11 +242,11 @@ int main(int argc, char *argv[])
     SSL_CTX *ctx = SSL_CTX_new(SSLv23_client_method());
     assert(ctx != NULL);
 
-    if (argc == 4)
+    if (argc == (optind + 3))
     {
         const char *cacert = NULL;
         const char *capath = NULL;
-        const char *path = argv[3];
+        const char *path = argv[optind + 2];
 
         if (isdir(path))
             capath = path;
