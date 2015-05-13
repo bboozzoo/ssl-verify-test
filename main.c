@@ -27,8 +27,10 @@
 #include <openssl/x509_vfy.h>
 #include <openssl/conf.h>
 
-#define LOG(...) \
-    fprintf(stderr, __VA_ARGS__)
+#define LOG(...)                                \
+    do {                                        \
+        fprintf(stderr, __VA_ARGS__);           \
+    } while(0)
 
 static int socket_setsockblock(int sock, int block)
 {
