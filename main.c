@@ -127,6 +127,19 @@ static int do_connect(const char *host, int port)
     return sock;
 }
 
+/**
+ * verify_callback:
+ * @preverify_ok: set to 1 if openssl has verified certificate as valid
+ * @ctx: certificate chain
+ *
+ * Perform certificate validation. The callback is supplementary to
+ * verification performed by openssl and can override the verification
+ * process outcome by either accepting certificates as valid or
+ * aborting prematurely. Simply returning 1 will advance the
+ * verification process even if the final result is failure. To
+ * override the verification result manually set error by calling
+ * X509_STORE_CTX_set_error(.., X509_V_OK) for particular certificate.
+ */
 static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
 {
     X509 *cert = X509_STORE_CTX_get_current_cert(ctx);
@@ -142,6 +155,7 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     LOG("   depth: %d preverify: %d err: %s\n",
         depth, preverify_ok, X509_verify_cert_error_string(err));
 
+    /* shall we override? */
     if (preverify_ok == 0 && always_accept)
     {
         LOG("overriding verification\n");
