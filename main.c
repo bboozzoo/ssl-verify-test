@@ -32,6 +32,13 @@
         fprintf(stderr, __VA_ARGS__);           \
     } while(0)
 
+/**
+ * socket_setsockblock:
+ * @sock: file descriptor
+ * @block: block setting
+ *
+ * Set/unset O_NONBLOCK
+ */
 static int socket_setsockblock(int sock, int block)
 {
     long arg;
@@ -54,8 +61,16 @@ static int socket_setsockblock(int sock, int block)
     return 0;
 }
 
+/**
+ * resolve_host:
+ * @host: hostname
+ * @addr: in_addr to place the result at
+ */
 static int resolve_host(const char *host, struct in_addr *addr)
 {
+    assert(host);
+    assert(addr);
+
     struct hostent *h = gethostbyname(host);
     if (!h)
     {
@@ -73,6 +88,13 @@ static int resolve_host(const char *host, struct in_addr *addr)
     return 0;
 }
 
+/**
+ * do_connect:
+ * @host: hostname
+ * @port: port
+ *
+ * Establish TCP connection to @host:@port. Return connected fd or -1.
+ */
 static int do_connect(const char *host, int port)
 {
     struct in_addr addr;
@@ -88,6 +110,7 @@ static int do_connect(const char *host, int port)
     in_addr.sin_port = htons(port);
     in_addr.sin_addr = addr;
 
+    LOG("connect...\n");
     int cret = connect(sock, (struct sockaddr *)&in_addr, sizeof(in_addr));
     if (cret == -1)
     {
@@ -107,6 +130,12 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
   return 1;
 }
 
+/**
+ * isdir:
+ * @path: path
+ *
+ * Check if given path points to a directory
+ */
 static int isdir(const char *path)
 {
     struct stat st;
@@ -117,6 +146,7 @@ static int isdir(const char *path)
             return 1;
         return 0;
     }
+    /* return not-dir anyway */
     return 0;
 }
 
@@ -138,6 +168,7 @@ int main(int argc, char *argv[])
     int fd = do_connect(host, port);
     if (fd == -1)
     {
+        LOG("no connection\n");
         exit(1);
     }
 
@@ -146,8 +177,9 @@ int main(int argc, char *argv[])
     socket_setsockblock(fd, 0);
 
     LOG("connected: %d\n", fd);
-    OPENSSL_config(NULL);
 
+    /* init openssl */
+    OPENSSL_config(NULL);
     SSL_library_init();
     SSL_load_error_strings();
 
@@ -175,11 +207,15 @@ int main(int argc, char *argv[])
 
     }
 
-    printf("SSL options: %08x\n", SSL_CTX_get_options(ctx));
+    printf("SSL options: 0x%08x\n", SSL_CTX_get_options(ctx));
+
     SSL *ssl = SSL_new(ctx);
     assert(ssl != NULL);
 
+    /* enable peer verification */
     SSL_set_verify(ssl, SSL_VERIFY_PEER, verify_callback);
+
+    /* set file descriptor */
     SSL_set_fd(ssl, fd);
 
     int handshake_status = 0;
@@ -213,7 +249,7 @@ int main(int argc, char *argv[])
 
         int vres = SSL_get_verify_result(ssl);
         LOG("verify result: %s\n",
-               X509_verify_cert_error_string(vres));
+            X509_verify_cert_error_string(vres));
         if (vres != X509_V_OK)
         {
             int err = SSL_get_error(ssl, vres);
