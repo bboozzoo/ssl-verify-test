@@ -147,11 +147,14 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx)
     int err;
     int depth;
 
-    X509_NAME_oneline(X509_get_subject_name(cert), buf, sizeof(buf));
 
     err = X509_STORE_CTX_get_error(ctx);
     depth = X509_STORE_CTX_get_error_depth(ctx);
-    LOG("verify: %s\n", buf);
+    X509_NAME_oneline(X509_get_subject_name(cert), buf, sizeof(buf));
+    LOG("verify: s = %s\n", buf);
+    X509_NAME_oneline(X509_get_issuer_name(cert), buf, sizeof(buf));
+    LOG("        i = %s\n", buf);
+
     LOG("   depth: %d preverify: %d err: %s\n",
         depth, preverify_ok, X509_verify_cert_error_string(err));
 
